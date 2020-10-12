@@ -33,20 +33,19 @@ int call_uart(int ttype, float * f_buf)
     {
         char rx_sig_1 = 0xA1;
         if(tx_rx(rx_sig_1, f_buf) < 0)
-            return -1;
+            fprintf(stderr, "ERROR\n");
     }
     
     else if(ttype == 1) // reference temperature
     {
         char rx_sig_1 = 0xA2;
         if(tx_rx(rx_sig_1, f_buf) < 0)
-            return -1;
+            fprintf(stderr, "ERROR\n");
     }
 
     else 
     {
         printf("Invalid option\n");
-        return -1;
     }
 
     return 0;
@@ -67,16 +66,15 @@ int tx_rx(char rx_sig_1, float * f_buf)
     if (count < 0)
     {
         printf("UART TX error\n");
-        return -1;
     }
 
-    usleep(30000);
+    usleep(50000);
 
     int rx_length = read(uart_filestream, f_buf, sizeof(float));
     if (rx_length < 0)
     {
-        printf("Reading error.\n"); //An error occured (will occur if there are no bytes)
-        return -1;
+        //printf("Reading error.\n"); //An error occured (will occur if there are no bytes)
+
     }
 
     return 0;

@@ -42,8 +42,9 @@ float TI = 0.0,
       TE = 0.0;
 
 short count = 1, 
-      p_controller = 0,
-      hist = 4;
+      p_controller = 0;
+
+float hist = 4;
 
 pthread_t t0, t1, t2, t3, t4, t5;
 FILE *file;
@@ -54,11 +55,6 @@ char str_TR[50] = "",
 
 int main(int argc, const char * argv[])
 {
-    // else if(!file) 
-    // {
-    //     file = fopen("./data.csv", "a");
-    //     fprintf(file, "DATE,HOUR,TI,TE,TR\n");
-    // }
 
     // configuring GPIO pins
     //clear_outputs();
@@ -94,25 +90,26 @@ void sig_handler(int signal)
 
 void alarm_handler(int signal)
 {
-    if(p_controller == 1)
+    if(p_controller)
     {
         pthread_create(&t0, NULL, temperature_input, NULL); // get TR
     }
 
-
-
     pthread_create(&t1, NULL, internal_temp, NULL); // get TI
     pthread_create(&t2, NULL, external_temp, NULL); // get TE
 
-    // pthread_create(&t3, NULL, lcd, NULL); // write in lcd
-    // pthread_create(&t4, NULL, controller, NULL); // control internal temperature
+    if(count % 2) pthread_create(&t3, NULL, lcd, NULL); // write in lcd
+    pthread_create(&t4, NULL, controller, NULL); // control internal temperature
 
-    if(count == 4)
+    if((count == 4) && (TR != 0.0))
     {
         pthread_create(&t5, NULL, (void *) &file_write, file);
-        count = 0;
+        count = 1;
     }
+
     count++; 
+
+    if(TR == 0.0) count = 1;
 }
 
 void * file_write(FILE *file)
@@ -120,10 +117,20 @@ void * file_write(FILE *file)
     char date[DATE_SIZE];
     char hour[HOUR_SIZE];
 
-    file = fopen("./data.csv", "a");
+    if((file = fopen("./data.csv", "r")))
+    {
+        fclose(file);
+        file = fopen("./data.csv", "a");
+        format_time(date, hour);
+        fprintf(file, "%s,%s,%0.2f,%0.2f,%0.2f\n", date, hour, TI, TE, TR);
+    }
 
-    format_time(date, hour);
-    fprintf(file, "%s,%s,%0.2f,%0.2f,%0.2f\n", date, hour, TI, TE, TR);
+    else
+    {
+        file = fopen("./data.csv", "a+");
+        fprintf(file, "DATE,HOUR,TI,TE,TR\n");
+    }
+    
     fclose(file);
 
 }
@@ -145,13 +152,13 @@ void * external_temp()
 
 void * controller()
 {
-    if(TI > (TR + (hist / 2)))
+    if(TI > TR + (hist / 2))
     {
         set_r_pin_value(1);
         set_v_pin_value(0);
     }
 
-    else if(TI < (TR - (hist / 2)))
+    else if(TI < TR -(hist / 2))
     {
         set_v_pin_value(1);
         set_r_pin_value(0);
@@ -161,6 +168,7 @@ void * controller()
     {
         set_v_pin_value(1);
         set_r_pin_value(1);
+
     }
 }
 
@@ -212,7 +220,6 @@ void * menu(void * args)
                 {
                     scanf("%c", &q);
                     printf("\n");
-                    pause();
 
                     if(q == 'q')
                     {
@@ -234,7 +241,7 @@ void * menu(void * args)
 
             case 3:
                 printf("Enter the new hysteresis value -> ");
-                scanf("%hd", &hist);
+                scanf("%f", &hist);
                 printf("\n");
                 clear_outputs();
             break;
@@ -256,7 +263,10 @@ void * lcd()
 {
     lcd_init(); 
 
+    clear_lcd();
+
     sleep(1);
+
     
     while(1)
     {
@@ -270,6 +280,7 @@ void * lcd()
         write_string("TR:");
         write_float(TR);
     }
+    
 }
 
 void format_time(char *date_string, char *hour_string) 
